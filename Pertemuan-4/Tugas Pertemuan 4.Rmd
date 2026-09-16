@@ -1,0 +1,670 @@
+---
+title: "Tugas MPDW Pertemuan 4"
+author: "Joe Anthonie Oktavian"
+date: "2026-09-14"
+output:
+  html_document:
+    theme: flatly          
+    highlight: tango       
+    toc: true              
+    toc_float:
+      collapsed: true      
+      smooth_scroll: true  
+    number_sections: true  
+    code_folding: show     
+    df_print: paged     
+---
+
+## Proses MA
+
+Proses MA dapat dituliskan sebagai berikut:
+
+$$y_t = c + e_t + \theta_1 e_{t-1} + \theta_2 e_{t-2} + \cdots + \theta_q e_{t-q}$$
+
+atau dapat dituliskan dalam notasi sigma sebagai:
+
+$$y_t = c + e_t + \sum_{i=1}^{q} \theta_i e_{t-i}$$
+
+Terlihat bahwa $e_t$, atau *white noise*, berperan penting dalam pembangkitan proses MA.
+
+### Pembangkitan Proses MA(2) secara Manual
+
+Akan dicoba membangkitkan proses MA(2) dengan $\theta_1=0.4$ dan $\theta_2=0.6$ sebanyak 200 observasi dengan $c=0$. Karena diperlukan dua nilai awal untuk $e_{t-1}$ dan $e_{t-2}$, maka dua nilai pertama white noise digunakan sebagai nilai awal tersebut.
+
+```{r}
+set.seed(20)
+
+n <- 300
+
+# Bangkitkan white noise
+wn <- rnorm(n)
+
+# Pemodelan MA manual
+ma_manual <- numeric(n)
+
+# Dua nilai awal
+ma_manual[1] <- wn[1]
+ma_manual[2] <- wn[2]
+
+# Proses MA(2)
+for (i in 3:n) {
+  ma_manual[i] <- wn[i] +
+    0.4 * wn[i - 1] +
+    0.6 * wn[i - 2]
+}
+```
+
+```{r}
+ma_manual
+```
+
+### Pembangkitan Proses MA(2) dengan arima.sim
+
+```{r}
+ma2 <- arima.sim(
+  model = list(order = c(0, 0, 2), ma = c(0.4, 0.6)),
+  n = 300
+)
+
+ma2
+```
+
+## Karakteristik MA(2)
+
+### Plot Time Series
+
+```{r}
+ts.plot(ma_manual)
+```
+
+Berdasarkan plot time series, terlihat bahwa pembangkitan data MA(2) bersifat stasioner dalam rataan.
+
+### Plot ACF MA(2) (Manual)
+
+```{r}
+acf(ma_manual,lag.max = 20)
+```
+
+Berdasarkan visualisasi, terlihat bahwa plot ACF cuts off setelah lag ke-2.
+
+### Plot PACF MA(2) (Manual)
+
+```{r}
+pacf(ma_manual)
+```
+
+Berdasarkan visualisasi, terlihat bahwa plot PACF mengalami tailing off setelah lag ke-2 dan menunjukkan pola osilasi yang menyerupai gelombang sinusoidal.
+
+### Plot EACF MA(2) (Manual)
+
+```{r}
+TSA::eacf(ma_manual)
+```
+
+Berdasarkan pola segitiga nol pada plot EACF, terlihat bahwa segitiga nol berada pada ordo AR(0) dan ordo MA(2).
+
+### Scatter Plot MA(2)
+
+#### Yt vs Yt-1
+
+```{r}
+yt_ma1 <- ma_manual[-1]
+yt_1 <- ma_manual[-length(ma_manual)]
+
+plot(
+  yt_1, yt_ma1,
+  xlab = expression(Y[t-1]),
+  ylab = expression(Y[t]),
+  main = expression(paste("Scatter Plot ", Y[t], " vs ", Y[t-1]))
+)
+```
+
+#### Yt vs Yt-2
+
+```{r}
+yt_ma2 <- ma_manual[-c(1, 2)]
+yt_2 <- ma_manual[-c(length(ma_manual)-1, length(ma_manual))]
+
+plot(
+  yt_2, yt_ma2,
+  xlab = expression(Y[t-2]),
+  ylab = expression(Y[t]),
+  main = expression(paste("Scatter Plot ", Y[t], " vs ", Y[t-2]))
+)
+```
+
+#### Yt vs Yt-3
+
+```{r}
+yt_ma3 <- ma_manual[-c(1, 2, 3)]
+yt_3 <- ma_manual[-c(length(ma_manual)-2, length(ma_manual)-1, length(ma_manual))]
+
+plot(
+  yt_3, yt_ma3,
+  xlab = expression(Y[t-3]),
+  ylab = expression(Y[t]),
+  main = expression(paste("Scatter Plot ", Y[t], " vs ", Y[t-3]))
+)
+```
+
+Berdasarkan scatter plot, didapatkan hubungan positif antara $Y_t$ dengan $Y_{t-1}$, $Y_t$ dengan $Y_{t-2}$, serta $Y_t$ dengan $Y_{t-3}$. Hasil ini selanjutnya akan diverifikasi melalui perhitungan autokorelasi.
+
+### Perhitungan Autokorelasi MA(2)
+
+#### Yt vs Yt-1
+
+```{r}
+cor(yt_ma1,yt_1)
+```
+
+Autokorelasi pada lag ke-1 untuk proses MA(2) dapat dihitung menggunakan persamaan:
+
+$$\rho(1) =
+\frac{-\theta_1 +\theta_1\theta_2}
+{1 + \theta_1^2 + \theta_2^2}.$$
+
+Dengan $\theta_1 = -0.4$ dan $\theta_2 = -0.6$, diperoleh:
+
+$$\rho(1) =
+\frac{-(-0.4) + (-0.4)(-0.6)}
+{1 + (0.4)^2 + (0.6)^2}.$$
+
+Sehingga:
+
+$$\rho(1) =
+\frac{0.64}{1.52}
+\approx 0.421.$$
+
+Dengan demikian, autokorelasi teoritis pada lag ke-1 adalah sekitar $0.421$, yang menunjukkan adanya hubungan positif antara $Y_t$ dan $Y_{t-1}$.
+
+Hasil autokorelasi pada data bangkitan memiliki hasil yang tidak jauh berbeda dibandingkan perhitungan teoretisnya.
+
+#### Yt vs Yt-2
+
+```{r}
+cor(yt_ma2,yt_2)
+```
+
+Autokorelasi pada lag ke-2 untuk proses MA(2) dapat dihitung menggunakan persamaan:
+
+$$\rho(1) =
+\frac{-\theta_2}
+{1 + \theta_1^2 + \theta_2^2}.$$
+
+Dengan $\theta_2 = 0.6$, diperoleh:
+
+$$\rho(1) =
+-\frac{(-0.6)}
+{1 + (0.4)^2 + (0.6)^2}.$$
+
+Sehingga:
+
+$$\rho(1) =
+\frac{0.6}{1.52}
+\approx 0.395.$$
+
+Dengan demikian, autokorelasi teoritis pada lag ke-1 adalah sekitar $0.395$, yang menunjukkan adanya hubungan positif antara $Y_t$ dan $Y_{t-1}$.
+
+Hasil autokorelasi pada data bangkitan memiliki hasil yang tidak jauh berbeda dibandingkan perhitungan teoretisnya.
+
+#### Yt vs Yt-3
+
+```{r}
+cor(yt_ma3,yt_3)
+```
+
+Hasil ini cukup sesuai secara teoretis, karena untuk MA(2), nilai autokorelasi antara $Y_t$ dengan $Y_{t-3}$ adalah 0.
+
+## Proses AR(2)
+
+Proses AR dapat dituliskan sebagai berikut:
+
+$$Y_t = c + \varepsilon_t + \phi_1Y_{t-1} + \phi_2Y_{t-2} + \cdots + \phi_pY_{t-p}$$
+
+atau dapat dituliskan dalam bentuk notasi sigma sebagai berikut:
+
+$$Y_t = c + \varepsilon_t + \sum_{i=1}^{p}\phi_iY_{t-i}.$$
+
+Terlihat bahwa $Y_t$ berperan penting dalam pembangkitan proses AR karena nilai $Y_t$ dipengaruhi oleh nilai observasi pada waktu-waktu sebelumnya, yaitu $Y_{t-1}, Y_{t-2}, \ldots, Y_{t-p}$.
+
+### Pembangkitan secara Manual
+
+Akan dicoba membangkitkan proses AR(2) dengan $\phi_1=0.5$ dan $\phi_2=0.2$ sebanyak 300 observasi dengan $c=0$. Proses tersebut dapat dituliskan sebagai berikut:
+
+$$Y_t = 0 + \varepsilon_t + 0.5Y_{t-1} + 0.2Y_{t-2}.$$
+
+```{r}
+set.seed(20)
+
+n <- 300
+
+ar <- c(1:n)
+
+for (i in 3:n) {
+  ar[i] <- wn[i] + 0.5 * ar[i-1] + 0.2 * ar[i-2]
+}
+
+ar
+```
+
+### Pembangkitan dengan arima.sim
+
+```{r}
+ar2 <- arima.sim(
+  model = list(order = c(2,0,0), ar = c(0.5, 0.2)),
+  n = 300
+)
+
+ar2
+```
+
+## Karakteristik AR(2)
+
+### Plot Time Series
+
+```{r}
+ts.plot(ar)
+```
+
+Berdasarkan plot time series, terlihat bahwa model AR(2) yang terbentuk cenderung bersifat stasioner dalam rataan.
+
+### Plot ACF AR(2)
+
+```{r}
+acf(ar)
+```
+
+Berdasarkan plot ACF, terlihat bahwa model AR(2) memiliki pola tails off setelah lag ke-2 dengan pola osilasi menyerupai gelombang sinusoidal.
+
+### Plot PACF AR(2)
+
+```{r}
+pacf(ar)
+```
+
+Berdasarkan plot PACF, terlihat bahwa model AR(2) menunjukkan pola cuts off setelah lag ke-2.
+
+### Plot EACF AR(2)
+
+```{r}
+TSA::eacf(ar)
+```
+
+Berdasarkan pola segitiga nol pada plot EACF, terlihat bahwa segitiga nol berada pada ordo AR(2) dan ordo MA(0)
+
+## Scatter Plot AR(2)
+
+### Yt vs Yt-1
+
+```{r}
+yt_ar1 <- ar[-1]
+yt_1 <- ar[-length(ar)]
+
+plot(
+  yt_1, yt_ar1,
+  xlab = expression(Y[t-1]),
+  ylab = expression(Y[t]),
+  main = expression(paste("Scatter Plot ", Y[t], " vs ", Y[t-1]))
+)
+```
+
+### Yt vs Yt-2
+
+```{r}
+yt_ar2 <- ar[-c(1, 2)]
+yt_2 <- ar[-c(length(ar)-1, length(ar))]
+
+plot(
+  yt_2, yt_ar2,
+  xlab = expression(Y[t-2]),
+  ylab = expression(Y[t]),
+  main = expression(paste("Scatter Plot ", Y[t], " vs ", Y[t-2]))
+)
+```
+
+### Yt vs Yt-3
+
+```{r}
+yt_ar3 <- ar[-c(1, 2, 3)]
+yt_3 <- ar[-c(length(ar)-2, length(ar)-1, length(ar))]
+
+plot(
+  yt_3, yt_ar3,
+  xlab = expression(Y[t-3]),
+  ylab = expression(Y[t]),
+  main = expression(paste("Scatter Plot ", Y[t], " vs ", Y[t-3]))
+)
+```
+
+## Perhitungan Autokorelasi
+
+Untuk proses AR(2), model yang digunakan adalah:
+
+$$Y_t = \phi_1 Y_{t-1} + \phi_2 Y_{t-2} + \varepsilon_t.$$
+
+Dengan $\phi_1 = 0.5$ dan $\phi_2 = 0.2$, model tersebut menjadi:
+
+$$Y_t = 0.5Y_{t-1} + 0.2Y_{t-2} + \varepsilon_t.$$
+
+Pada proses AR(2), autokorelasi dapat dihitung menggunakan persamaan Yule-Walker. Secara umum, persamaan Yule-Walker untuk AR(2) dapat dituliskan sebagai:
+
+$$\rho_k = \phi_1\rho_{k-1} + \phi_2\rho_{k-2}.$$
+
+### Yt vs Yt-1
+
+```{r}
+cor(yt_ar1,yt_1)
+```
+
+Untuk lag ke-1, persamaan Yule-Walker dapat dituliskan sebagai:
+
+$$\rho_1 = \phi_1 + \phi_2\rho_1.$$ Dengan $\phi_1 = 0.5$ dan $\phi_2 = 0.2$, diperoleh:
+
+$$\rho_1 = 0.5 + 0.2\rho_1.$$
+
+Sehingga:
+
+$$\rho_1 - 0.2\rho_1 = 0.5$$
+
+$$0.8\rho_1 = 0.5$$
+
+$$\rho_1 = \frac{0.5}{0.8}$$
+
+$$\rho_1 = 0.625.$$ Hasil perhitungan dengan fungsi menunjukkan hasil yang tidak jauh berbeda dibandingkan perhitungan teoretisnya.
+
+### Yt vs Yt-2
+
+```{r}
+cor(yt_ar2, yt_2)
+```
+
+Selanjutnya, untuk lag ke-2 digunakan persamaan:
+
+$$\rho_2 = \phi_1\rho_1 + \phi_2.$$
+
+Dengan memasukkan nilai $\phi_1 = 0.5$, $\phi_2 = 0.2$, dan $\rho_1 = 0.625$, diperoleh:
+
+$$\rho_2 = (0.5)(0.625) + 0.2.$$
+
+Sehingga:
+
+$$\rho_2 = 0.3125 + 0.2$$
+
+$$\rho_2 = 0.5125.$$ Hasil perhitungan autokorelasi $Y_t$ dengan $Y_{t-2}$ secara fungsi memiliki hasil yang tidak jauh berbeda dengan perhitungan teoretisnya.
+
+### Yt vs Yt-3
+
+```{r}
+cor(yt_ar3,yt_3)
+```
+
+Untuk lag berikutnya, nilai autokorelasi dapat dihitung secara rekursif menggunakan:
+
+$$\rho_k = \phi_1\rho_{k-1} + \phi_2\rho_{k-2}.$$
+
+Sebagai contoh, untuk lag ke-3:
+
+$$\rho_3 = \phi_1\rho_2 + \phi_2\rho_1.$$
+
+Dengan demikian:
+
+$$\rho_3 = (0.5)(0.5125) + (0.2)(0.625).$$
+
+Sehingga:
+
+$$\rho_3 = 0.25625 + 0.125$$
+
+$$\rho_3 = 0.38125.$$
+
+Meskipun terdapat perbedaan nilai autokorelasi antara $Y_t$ dengan $Y_{t-3}$ dibandingkan dengan lag sebelumnya, secara umum terlihat bahwa nilai autokorelasi cenderung menurun seiring dengan peningkatan lag pada proses AR(2). Pola tersebut sesuai dengan karakteristik teoritis proses AR(2), yaitu autokorelasi tidak mengalami *cut-off* secara langsung, melainkan berangsur menuju nol (*tails off*). Selain itu, dengan $\phi_1 = 0.5$ dan $\phi_2 = 0.2$, kondisi stasioneritas AR(2) terpenuhi sehingga proses memiliki karakteristik autokorelasi yang stabil terhadap waktu.
+
+## Proses ARMA(2,2)
+
+Proses ARMA menggabungkan komponen Autoregressive (AR) dan Moving Average (MA). Secara umum, proses ARMA($p,q$) dapat dituliskan sebagai:
+
+$$Y_t = c + \sum_{i=1}^{p} \phi_i Y_{t-i} + \varepsilon_t + \sum_{j=1}^{q} \theta_j \varepsilon_{t-j}$$
+
+Pada persamaan tersebut, komponen AR menunjukkan bahwa nilai $Y_t$ dipengaruhi oleh nilai observasi pada waktu-waktu sebelumnya, sedangkan komponen MA menunjukkan bahwa $Y_t$ juga dipengaruhi oleh shock atau white noise pada waktu sebelumnya.
+
+Untuk proses ARMA(2,2), model dapat dituliskan sebagai:
+
+$$Y_t = c + \phi_1 Y_{t-1} + \phi_2 Y_{t-2} + \varepsilon_t + \theta_1 \varepsilon_{t-1} + \theta_2 \varepsilon_{t-2}$$
+
+### Pembangkitan secara Manual
+
+```{r}
+set.seed(20)
+
+n <- 300
+
+phi <- c(0.5, 0.2)
+theta <- c(0.4, 0.6)
+
+e <- rnorm(n)
+
+arma <- numeric(n)
+
+for (t in 3:n) {
+  
+  ar_part <- phi %*% arma[c(t-1, t-2)]
+  
+  ma_part <- theta %*% e[c(t-1, t-2)]
+  
+  arma[t] <- ar_part + e[t] + ma_part
+}
+
+arma
+```
+
+### Pembangkitan dengan arima.sim
+
+```{r}
+set.seed(20)
+
+arma22 <- arima.sim(
+  list(
+    order = c(2, 0, 2),
+    ar = c(0.5, 0.2),
+    ma = c(0.4, 0.6)
+  ),
+  n = 300
+)
+
+arma22
+```
+
+## Karakteristik ARMA(2,2)
+
+### Plot Time Series
+
+```{r}
+par(
+  mfrow = c(2, 2),
+  mar = c(3, 3, 2, 1)
+)
+
+ts.plot(
+  arma,
+  main = "ARMA(2,2) Manual",
+  ylab = "Yt",
+  xlab = "Time"
+)
+
+ts.plot(
+  arma22,
+  main = "ARMA(2,2) arima.sim",
+  ylab = "Yt",
+  xlab = "Time"
+)
+
+```
+
+Berdasarkan plot time series, terlihat bahwa model ARMA(2,2) cenderung stasioner dalam rataan.
+
+### Plot ACF
+
+```{r}
+acf(
+  arma,
+  main = "ACF ARMA(2,2) Manual"
+)
+```
+
+Berdasarkan plot ACF, terlihat bahwa model ARMA(2,2) memiliki pola tails off, dengan osilasi berbentuk menyerupai gelombang sinusoidal.
+
+### Plot PACF
+
+```{r}
+pacf(
+  arma,
+  main = "PACF ARMA(2,2)"
+)
+```
+
+Berdasarkan plot PACF, model ARMA(2,2) menunjukkan pola tails off, dengan osilasi berbentuk menyerupai gelombang sinusoidal.
+
+### Plot EACF
+
+```{r}
+TSA::eacf(arma)
+```
+
+Berdasarkan hasil EACF, terlihat pola yang mengindikasikan kandidat model pada orde AR = 2 dan MA = 2. Hal ini sesuai dengan model yang digunakan dalam pembangkitan data, yaitu ARMA(2,2). Dengan demikian, hasil EACF memberikan indikasi awal bahwa model ARMA(2,2) sesuai untuk data yang dibangkitkan.
+
+## Scatter Plot
+
+### Yt vs Yt-1
+
+```{r}
+yt_arma_1 <- arma[-1]
+yt_1 <- arma[-length(arma)]
+
+plot(
+  yt_1, yt_arma_1,
+  xlab = expression(Y[t-1]),
+  ylab = expression(Y[t]),
+  main = expression(paste(Y[t], " vs ", Y[t-1]))
+)
+```
+
+### Yt vs Yt-2
+
+```{r}
+yt_arma_2 <- arma[-c(1, 2)]
+yt_2 <- arma[-c(length(arma)-1, length(arma))]
+
+plot(
+  yt_2, yt_arma_2,
+  xlab = expression(Y[t-2]),
+  ylab = expression(Y[t]),
+  main = expression(paste(Y[t], " vs ", Y[t-2]))
+)
+```
+
+### Yt vs Yt-3
+
+```{r}
+yt_arma_3 <- arma[-c(1, 2, 3)]
+yt_3 <- arma[-c(length(arma)-2,
+                       length(arma)-1,
+                       length(arma))]
+
+plot(
+  yt_3, yt_arma_3,
+  xlab = expression(Y[t-3]),
+  ylab = expression(Y[t]),
+  main = expression(paste(Y[t], " vs ", Y[t-3]))
+)
+```
+
+## Perhitungan Autokorelasi
+
+Fungsi autokorelasi ($\rho_k$) didefinisikan sebagai $\rho_k = \frac{\gamma_k}{\gamma_0}$, di mana $\gamma_k = E[Y_t Y_{t-k}]$ adalah autovarians pada lag $k$.
+
+a.  Menghitung Autovarians ($\gamma_k$) Mengalikan persamaan model dengan $Y_{t-k}$ lalu mengambil nilai harapannya:
+
+<!-- -->
+
+1.  **Untuk** $k = 0$ (Varians $\gamma_0$): $$\gamma_0 = \phi_1 \gamma_1 + \phi_2 \gamma_2 + \sigma^2 - \theta_1 E[e_{t-1} Y_t] - \theta_2 E[e_{t-2} Y_t]$$
+
+2.  **Untuk** $k = 1$: $$\gamma_1 = \phi_1 \gamma_0 + \phi_2 \gamma_1 - \theta_1 \sigma^2 - \theta_2 E[e_{t-2} Y_{t-1}]$$
+
+3.  **Untuk** $k = 2$: $$\gamma_2 = \phi_1 \gamma_1 + \phi_2 \gamma_0 - \theta_2 \sigma^2$$
+
+4.  **Untuk** $k \ge 3$: Komponen MA sudah tidak berpengaruh ($E[e_{t-j} Y_{t-k}] = 0$ untuk $j < k$), sehingga berlaku hubungan rekursif: $$\gamma_k = \phi_1 \gamma_{k-1} + \phi_2 \gamma_{k-2}$$
+
+------------------------------------------------------------------------
+
+b.  Persamaan Rekursif Autokorelasi ($\rho_k$)
+
+Membagi seluruh suku autovarians dengan $\gamma_0$, diperoleh sifat autokorelasi teoretis ARMA(2,2):
+
+- **Persamaan Awal (**$k = 1, 2$): Nilai $\rho_1$ dan $\rho_2$ diperoleh dari penyelesaian sistem persamaan linear simultaneous Yule-Walker yang melibatkan koefisien AR ($\phi_1, \phi_2$) dan MA ($\theta_1, \theta_2$).
+- **Persamaan Rekursif (**$k \ge 2$): $$\rho_k = \phi_1 \rho_{k-1} + \phi_2 \rho_{k-2} \quad \text{untuk } k \ge 2$$ \### Yt vs Yt-1
+
+### Yt vs Yt-1
+
+```{r}
+cor(yt_arma_1,yt_1)
+```
+
+$$\rho_1
+=
+\frac{\gamma_1}{\gamma_0}
+=
+\frac{4.310684}{5.017094}
+=
+0.8592$$
+
+Hasil perhitungan autokorelasi dengan fungsi antara $Y_t$ dengan $Y_{t-1}$ menunjukkan hasil yang tidak jauh berbeda dengan perhitungan teoretisnya.
+
+### Yt vs Yt-2
+
+```{r}
+cor(yt_2,yt_arma_2)
+```
+
+$$\rho_2
+=
+\frac{\gamma_2}{\gamma_0}
+=
+\frac{3.758761}{5.017094}
+=
+0.7492$$
+
+Hasil perhitungan autokorelasi dengan fungsi antara $Y_t$ dengan $Y_{t-2}$ menunjukkan hasil yang tidak jauh berbeda dengan perhitungan teoretisnya.
+
+### Yt vs Yt-3
+
+Karena k\>q dengan q=2, perhitungan autokorelasi secara teoretis mengikuti persamaan rekursif dari bagian AR, yaitu menggunakan persamaan Yule-Walker.
+
+```{r}
+cor(yt_3,yt_arma_3)
+```
+
+$$\rho_k
+=
+\phi_1\rho_{k-1}
++
+\phi_2\rho_{k-2},
+\qquad k \geq 3$$
+
+$$\rho_3
+=
+0.5\rho_2
++
+0.2\rho_1$$
+
+$$\rho_3
+=
+0.5(0.7492)
++
+0.2(0.8592)
+=
+0.5464$$
+
+Meskipun terdapat fluktuasi nilai autokorelasi pada lag awal (seperti perbedaan pola antara $Y_t$ dengan $Y_{t-3}$ dibandingkan dengan lag sebelumnya), secara umum terlihat bahwa nilai autokorelasi cenderung menurun secara berangsur menuju nol (*tails off*) seiring dengan bertambahnya lag. Pola peluruhan teredam (*damped decay*) ini sesuai dengan karakteristik teoretis dari model **ARMA(2,2)**, di mana efek komponen $\text{MA}(2)$ mempengaruhi dinamika awal hingga lag-2, yang kemudian dilanjutkan oleh komponen $\text{AR}(2)$ sehingga autokorelasi tidak mengalami *cut-off* secara langsung.
+
+Selain itu, dengan parameter $\phi_1 = 0.5$ dan $\phi_2 = 0.2$, kondisi stasioneritas model terbukti terpenuhi karena memenuhi ketiga syarat segitiga stasioneritas: 1. $\phi_1 + \phi_2 = 0.5 + 0.2 = 0.7 < 1$ 2. $\phi_2 - \phi_1 = 0.2 - 0.5 = -0.3 < 1$ 3. $|\phi_2| = |0.2| = 0.2 < 1$
+
+Dengan terpenuhinya syarat-syarat tersebut, proses ARMA(2,2) ini dipastikan stasioner dan memiliki karakteristik autokorelasi yang stabil terhadap waktu.
